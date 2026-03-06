@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import "./App.css";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -199,6 +200,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <Analytics />
       <div className="grain" />
       <div className="wrap">
         <div className="hdr">
