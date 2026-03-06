@@ -3,7 +3,6 @@ import "./App.css";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 const LOADING_MSGS = [
   "bestie this is a lot to unpack...",
@@ -50,6 +49,7 @@ async function supabaseSave(shareCode, data) {
         architecture_input: data.architecture_input,
         intensity: data.intensity,
         grade: data.grade,
+        grade_label: data.grade_label,
         vibe_check: data.vibe_check,
         worst_crime: data.worst_crime,
         roast: data.roast,
@@ -87,61 +87,18 @@ async function supabaseFetch(shareCode) {
   }
 }
 
-async function callClaude(architecture, intensity) {
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error("Missing VITE_ANTHROPIC_API_KEY");
-  }
-
-  const intensityGuide = {
-    bestie:
-      "Be gentle but honest. Use Gen Z slang affectionately. Point out issues but stay supportive like a good friend reviewing a PR.",
-    nocap:
-      "Be direct and savage. No sugarcoating. Heavy Gen Z slang. Call out every bad decision like you're reviewing the worst PR of your life.",
-    nuclear:
-      "ABSOLUTELY UNHINGED. Maximum savagery. Make them question their career choices. Full chaos mode, existential dread, gen z slang overload.",
-  };
-
-  const prompt = `You are "RoastGPT", an elite system design roaster who speaks in Gen Z slang but has deep knowledge of distributed systems, scalability, and architecture patterns.
-
-Intensity level: ${intensity.toUpperCase()}
-Intensity guide: ${intensityGuide[intensity]}
-
-Architecture to roast:
-${architecture}
-
-Respond ONLY with valid JSON (no markdown, no backticks, no text outside the JSON object):
-{
-  "grade": "one letter: S, A, B, C, D, or F",
-  "grade_label": "short gen z phrase for this grade",
-  "vibe_check": "one punchy sentence summarizing the whole situation in gen z speak",
-  "worst_crime": "the single most egregious architectural problem, described dramatically in gen z style",
-  "roast": "2-3 paragraphs roasting the architecture with specific technical callouts. Be technically accurate while being unhinged.",
-  "glow_up": "2-3 specific actionable improvements written in gen z style but with real technical substance. The redemption arc."
-}`;
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+async function callRoastAPI(architecture, intensity) {
+  const response = await fetch("/api/roast", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ architecture, intensity }),
   });
 
   if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Claude API error: ${response.status} ${errText}`);
+    throw new Error(`API error: ${response.status}`);
   }
 
-  const data = await response.json();
-  const text = data.content.map((b) => b.text || "").join("");
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  return response.json();
 }
 
 export default function App() {
@@ -157,6 +114,15 @@ export default function App() {
   const [viewError, setViewError] = useState("");
   const [loadingView, setLoadingView] = useState(false);
   const intervalRef = useRef(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      setViewCode(code);
+      handleViewRoastByCode(code);
+    }
+  }, []);
 
   useEffect(() => {
     if (screen === "loading") {
@@ -179,7 +145,7 @@ export default function App() {
     setError("");
     setScreen("loading");
     try {
-      const roastData = await callClaude(architecture, intensity);
+      const roastData = await callRoastAPI(architecture, intensity);
       const code = crypto.randomUUID().split("-")[0];
       await supabaseSave(code, {
         architecture_input: architecture,
@@ -188,6 +154,7 @@ export default function App() {
       });
       setResult({ ...roastData, architecture_input: architecture, intensity });
       setShareCode(code);
+      window.history.replaceState({}, "", `?code=${code}`);
       setScreen("result");
     } catch (e) {
       console.error(e);
@@ -196,11 +163,10 @@ export default function App() {
     }
   };
 
-  const handleViewRoast = async () => {
-    if (!viewCode.trim()) return;
+  const handleViewRoastByCode = async (code) => {
     setViewError("");
     setLoadingView(true);
-    const data = await supabaseFetch(viewCode.trim());
+    const data = await supabaseFetch(code);
     setLoadingView(false);
     if (!data) {
       setViewError("no roast found with that code bestie 👀");
@@ -211,8 +177,20 @@ export default function App() {
     setScreen("result");
   };
 
-  const handleCopy = () => {
+  const handleViewRoast = async () => {
+    if (!viewCode.trim()) return;
+    await handleViewRoastByCode(viewCode.trim());
+  };
+
+  const handleCopyCode = () => {
     navigator.clipboard.writeText(shareCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}?code=${shareCode}`;
+    navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -332,11 +310,18 @@ export default function App() {
             </div>
 
             <div className="share">
-              <div className="slbl">share code</div>
-              <div className="scode">{shareCode}</div>
-              <button className={`cbtn ${copied ? "ok" : ""}`} onClick={handleCopy}>
-                {copied ? "✓ copied" : "copy"}
-              </button>
+              <div className="share-row">
+                <div className="slbl">share code</div>
+                <div className="scode">{shareCode}</div>
+              </div>
+              <div className="share-btns">
+                <button className={`cbtn ${copied ? "ok" : ""}`} onClick={handleCopyCode}>
+                  {copied ? "✓ copied" : "copy code"}
+                </button>
+                <button className="cbtn" onClick={handleCopyLink}>
+                  copy link 🔗
+                </button>
+              </div>
             </div>
 
             <button
@@ -347,6 +332,7 @@ export default function App() {
                 setArchitecture("");
                 setShareCode("");
                 setCopied(false);
+                window.history.replaceState({}, "", window.location.pathname);
               }}
             >
               GET ROASTED AGAIN →

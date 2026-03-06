@@ -349,10 +349,14 @@
   border-radius: 3px;
   padding: 18px 20px;
   margin: 24px 0;
+}
+
+.share-row {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
 .slbl {
@@ -368,6 +372,12 @@
   color: #ff4500;
   letter-spacing: 4px;
   flex: 1;
+}
+
+.share-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cbtn {

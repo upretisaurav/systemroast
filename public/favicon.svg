@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SystemRoast">
+  <rect width="64" height="64" rx="10" fill="#080808"/>
+  <path d="M20 44h24v4H20z" fill="#ff4500"/>
+  <path d="M24 18h16v16H24z" fill="#ff4500"/>
+  <circle cx="28" cy="26" r="2" fill="#080808"/>
+  <circle cx="36" cy="26" r="2" fill="#080808"/>
+  <path d="M27 31c1.7 1.8 7.3 1.8 9 0" stroke="#080808" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>
